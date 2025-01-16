@@ -1,66 +1,80 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongo-deployment
+  name: webapp-deployment
   labels:
     # you can give any k8s component a label (key/value)
-    app: mongo
+    app: webapp
 spec:
   replicas: 1
   selector:
     matchLabels:
       # identify a set of resoures with same label
-      app: mongo
+      app: webapp
   # the template is the configuration for the pod
   # it configures the pod in the deployment 
   template:
     metadata:
       labels:
         # for pods , the label is MUST 
-        app: mongo
+        app: webapp
     spec:
       # you can have multiple containers in a pod 
       # in it we define which image  will be used to 
       # create this pod and the port 
-      # in our case we will use the mongodb imgae downloaded fron 
-      # https://hub.docker.com/_/mongo (search which tag yo want to use) 
-      containers:
-        # create Pods with Mongo:5.0 image 
-      - name: mongodb
-        image: mongo:5.0
+      # in our case we will use the nana mongodb imgae downloaded fron 
+      # https://hub.docker.com/r/nanajanashia/k8s-demo-app (search which tag yo want to use) 
+      containers: 
+      - name: webapp
+        image: nanajanashia/k8s-demo-app:v1.0
         ports:
-        - containerPort: 27017
+        - containerPort: 3000
+        ## Add here variables 
         env:
-        - name: MONGO_INITDB_ROOT_USERNAME # in the mongoDB page , we see that this var is required
-        # reference secret Data here instead of hardcode sensitive data
-        # Secret config file should not be checked into got repo
-          valueFrom:  # by stating valueFrom instead of value , it ,means we take it from secret
-            secretKeyRef: 
-              # we take from mongo-secret.yaml
-              name: mongo-secret   # this is the secret name in the mongo-secret.yaml
-              key: mongo-user # and the value of the key that we want to set the MONGO_INITDB_ROOT_USERNAME variable
-        - name: MONGO_INITDB_ROOT_PASSWORD
+        - name: USER_NAME
+          # this is copied from the mongo.yaml , from MONGO_INITDB_ROOT_USERNAME 
+          valueFrom: 
+              secretKeyRef: 
+                # we take from mongo-secret.yaml
+                name: mongo-secret
+                key: mongo-user 
+        - name: USER_PWD
           valueFrom: 
             secretKeyRef: 
               name: mongo-secret
               key: mongo-password 
+        - name: DB_URL
+        ### this value is taken from the configmap 
+          valueFrom:
+            configMapKeyRef: 
+              name: mongo-config
+              key: mongo-url
+
+
 ---
 
 apiVersion: v1
 kind: Service
 metadata:
   # the name is same as we defined in mongo-config (mongo-utl:)
-  name: mongo-service
+  name: webapp-service
 spec:
+  # the default type is ClisterIP , which is an internal Service 
+  # We will change it to NodePort 
+  type: NodePort 
   selector:
     # service forward the request to the pods 
     # so this value should be similar to the label of the pods above 
-    app: mongo
+    app: webapp
   ports:
     - protocol: TCP
-      # we can select any port 80,8080 but its usually set to the target port bewlow 
-      port: 27017
+      # we can select any port 80,8080 but its usually set to the target port below 
+      port: 3000
       # this is the port of the Pods 
       # it should be similar to the containerPort: above 
-      targetPort: 27017
+      targetPort: 3000
+      # since we change to NodePort , we need to add the nodePort var below 
+      # it exposed the Service on each Node's IP at a static port 
+      # it must be between 30000 to 32767 
+      nodePort: 30111
 
